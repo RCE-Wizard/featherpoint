@@ -4,3 +4,4 @@ web/node_modules/
 *.db
 *.pem
 deploy/certs/
+vagrant/.vagrant/
