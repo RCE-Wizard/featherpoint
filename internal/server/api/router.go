@@ -65,31 +65,24 @@ func NewRouter(db *store.DB, authSvc *auth.Service) *chi.Mux {
 	return r
 }
 
-// mTLSMiddleware verifies the client cert fingerprint and injects the agent ID into context.
-// During Phase 1 (plain HTTP testing), falls back to X-Agent-ID header.
+// mTLSMiddleware enforces mTLS for all agent endpoints.
+// It verifies the client cert against the CA and maps the fingerprint to an agent row.
+// The X-Agent-ID header fallback has been removed — all agent traffic must be mTLS.
 func (s *Server) mTLSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			cert := r.TLS.PeerCertificates[0]
-			fp := sha256.Sum256(cert.Raw)
-			fingerprint := hex.EncodeToString(fp[:])
-			agent, err := s.DB.GetAgentByCert(r.Context(), fingerprint)
-			if err != nil || agent == nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			ctx := contextWithAgentID(r.Context(), agent.ID)
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		// Phase 1 fallback: plain HTTP with X-Agent-ID header
-		agentID := r.Header.Get("X-Agent-ID")
-		if agentID == "" {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 			http.Error(w, "mTLS required", http.StatusUnauthorized)
 			return
 		}
-		ctx := contextWithAgentID(r.Context(), agentID)
+		cert := r.TLS.PeerCertificates[0]
+		fp := sha256.Sum256(cert.Raw)
+		fingerprint := hex.EncodeToString(fp[:])
+		agent, err := s.DB.GetAgentByCert(r.Context(), fingerprint)
+		if err != nil || agent == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		ctx := contextWithAgentID(r.Context(), agent.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

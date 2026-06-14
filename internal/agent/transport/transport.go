@@ -6,47 +6,40 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
 // Client is an outbound mTLS HTTP client.
 type Client struct {
-	http      *http.Client
-	baseURL   string
-	agentID   string
+	http    *http.Client
+	baseURL string
+	agentID string
 }
 
-// Config holds TLS material for the transport.
+// Config holds connection parameters for the transport.
 type Config struct {
-	BaseURL        string
-	AgentID        string
-	ClientCertFile string
-	ClientKeyFile  string
-	CACertFile     string
+	BaseURL   string
+	AgentID   string
+	TLSConfig *tls.Config // nil = plain HTTP (dev only)
 }
 
 func New(cfg Config) (*Client, error) {
-	tlsCfg, err := buildTLS(cfg)
-	if err != nil {
-		return nil, err
+	transport := &http.Transport{}
+	if cfg.TLSConfig != nil {
+		transport.TLSClientConfig = cfg.TLSConfig
 	}
 	return &Client{
-		http: &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: &http.Transport{TLSClientConfig: tlsCfg},
-		},
+		http:    &http.Client{Timeout: 30 * time.Second, Transport: transport},
 		baseURL: cfg.BaseURL,
 		agentID: cfg.AgentID,
 	}, nil
 }
 
-// NewPlain creates a client without mTLS, for Phase 1 testing.
+// NewPlain creates an unauthenticated client for Phase 1 / local testing.
 func NewPlain(baseURL, agentID string) *Client {
 	return &Client{
 		http:    &http.Client{Timeout: 30 * time.Second},
@@ -55,7 +48,7 @@ func NewPlain(baseURL, agentID string) *Client {
 	}
 }
 
-// Post sends a JSON-encoded request with gzip compression and retry backoff.
+// Post sends a gzip-compressed JSON request with exponential retry backoff.
 func (c *Client) Post(ctx context.Context, path string, req, resp interface{}) error {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -64,10 +57,9 @@ func (c *Client) Post(ctx context.Context, path string, req, resp interface{}) e
 
 	var gz bytes.Buffer
 	w := gzip.NewWriter(&gz)
-	if _, err := w.Write(body); err != nil {
-		return err
-	}
+	_, _ = w.Write(body)
 	w.Close()
+	compressed := gz.Bytes()
 
 	var lastErr error
 	for attempt := 0; attempt < 5; attempt++ {
@@ -82,12 +74,10 @@ func (c *Client) Post(ctx context.Context, path string, req, resp interface{}) e
 			case <-time.After(wait):
 			}
 		}
-
-		lastErr = c.doPost(ctx, path, gz.Bytes(), resp)
+		lastErr = c.doPost(ctx, path, compressed, resp)
 		if lastErr == nil {
 			return nil
 		}
-		// Don't retry on 4xx
 		if httpErr, ok := lastErr.(*HTTPError); ok && httpErr.Code < 500 {
 			return lastErr
 		}
@@ -102,9 +92,6 @@ func (c *Client) doPost(ctx context.Context, path string, body []byte, resp inte
 	}
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Content-Encoding", "gzip")
-	if c.agentID != "" {
-		r.Header.Set("X-Agent-ID", c.agentID)
-	}
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -119,7 +106,7 @@ func (c *Client) doPost(ctx context.Context, path string, body []byte, resp inte
 	return json.Unmarshal(raw, resp)
 }
 
-// HTTPError wraps a non-2xx response.
+// HTTPError wraps a non-2xx HTTP response.
 type HTTPError struct {
 	Code int
 	Body string
@@ -127,24 +114,4 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("HTTP %d: %s", e.Code, e.Body)
-}
-
-func buildTLS(cfg Config) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(cfg.ClientCertFile, cfg.ClientKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("load client cert: %w", err)
-	}
-
-	caData, err := os.ReadFile(cfg.CACertFile)
-	if err != nil {
-		return nil, fmt.Errorf("read CA cert: %w", err)
-	}
-	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(caData)
-
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      pool,
-		MinVersion:   tls.VersionTLS13,
-	}, nil
 }

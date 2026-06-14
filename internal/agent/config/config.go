@@ -18,6 +18,8 @@ type Config struct {
 	SpoolMaxBytes      int64  `json:"spool_max_bytes"`
 	HashConcurrency    int    `json:"hash_concurrency"`
 	MemLimitBytes      int64  `json:"mem_limit_bytes"`
+	// InsecureSkipVerify skips TLS server verification — dev/self-signed only.
+	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 }
 
 // State is the agent's persisted identity state.

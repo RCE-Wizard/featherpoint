@@ -1,4 +1,4 @@
-.PHONY: all server agent test migrate-up migrate-down dev-db dev-db-stop seed
+.PHONY: all server agent test migrate-up migrate-down dev-db dev-db-stop seed gen-certs
 
 MODULE := github.com/featherpoint/swinv
 
@@ -34,3 +34,6 @@ dev-setup: dev-db
 
 seed:
 	go run scripts/seed/main.go
+
+gen-certs:
+	go run scripts/gen-dev-certs/main.go
