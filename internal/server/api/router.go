@@ -42,6 +42,8 @@ func NewRouter(db *store.DB, authSvc *auth.Service) *chi.Mux {
 
 			// Fleet
 			r.Get("/agents", s.HandleListHosts)
+			r.Get("/agents/{agentID}", s.HandleGetAgent)
+			r.Get("/audit", s.HandleAuditLog)
 
 			// Reports (viewer + admin)
 			r.Get("/hosts/{hostID}/software", s.HandleHostSoftware)

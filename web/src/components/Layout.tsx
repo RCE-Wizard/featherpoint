@@ -6,6 +6,7 @@ const nav = [
   { to: '/reports/dormant', label: 'Dormant' },
   { to: '/reports/version-sprawl', label: 'Version sprawl' },
   { to: '/catalog', label: 'Catalog' },
+  { to: '/audit', label: 'Audit log', adminOnly: true },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           featherpoint
         </span>
         <nav className="flex gap-1">
-          {nav.map(({ to, label }) => (
+          {nav.filter(n => !('adminOnly' in n) || !n.adminOnly || role === 'admin').map(({ to, label }) => (
             <NavLink key={to} to={to}
               style={({ isActive }) => ({
                 padding: '4px 10px',

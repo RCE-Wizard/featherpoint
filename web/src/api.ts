@@ -27,6 +27,14 @@ export const api = {
     post<{ token: string; role: string }>('/login', { username, password }),
 
   agents: () => get<Agent[]>('/agents'),
+  agent: (id: string) => get<Agent>(`/agents/${id}`),
+  auditLog: (offset = 0) => get<Paged<AuditRow>>(`/audit?limit=100&offset=${offset}`),
+  pushConfig: (agentID: string, payload: Partial<AgentConfig>) =>
+    post<{ id: string }>(`/agents/${agentID}/commands`, { type: 'config_update', payload }),
+  decommission: (agentID: string) =>
+    post<{ id: string }>(`/agents/${agentID}/commands`, { type: 'decommission', payload: {} }),
+  scanNow: (agentID: string) =>
+    post<{ id: string }>(`/agents/${agentID}/commands`, { type: 'scan_now', payload: {} }),
 
   hostSoftware: (hostID: string, source?: string, offset = 0, limit = 100) =>
     get<Paged<HostSoftwareRow>>(`/hosts/${hostID}/software?source=${source ?? ''}&offset=${offset}&limit=${limit}`),
@@ -118,4 +126,22 @@ export interface CatalogEntry {
   source: string
   signed: boolean | null
   sha256: string | null
+}
+
+export interface AuditRow {
+  id: number
+  actor: string
+  action: string
+  target: string
+  detail: Record<string, unknown>
+  at: string
+}
+
+export interface AgentConfig {
+  process_interval_s: number
+  installed_interval_s: number
+  spool_max_bytes: number
+  hash_concurrency: number
+  mem_limit_bytes: number
+  server_url: string
 }

@@ -21,20 +21,10 @@ function ago(ts: string | null) {
 export function Fleet() {
   const navigate = useNavigate()
   const { data, isLoading, error } = useQuery({ queryKey: ['agents'], queryFn: api.agents })
-  const role = localStorage.getItem('role')
-
-  async function sendCommand(agentID: string, type: string) {
-    try {
-      await api.createCommand(agentID, type)
-      alert(`Command "${type}" queued.`)
-    } catch (e) {
-      alert(`Error: ${e}`)
-    }
-  }
 
   const columns = [
     { key: 'hostname', header: 'Host', render: (r: Agent) => (
-      <button onClick={() => navigate(`/hosts/${r.id}`)}
+      <button onClick={() => navigate(`/agents/${r.id}`)}
         style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 14 }}>
         {r.hostname ?? '—'}
       </button>
@@ -45,38 +35,16 @@ export function Fleet() {
     { key: 'status', header: 'Status', render: (r: Agent) => <Badge color={statusColor(r.status)}>{r.status}</Badge> },
     { key: 'last_checkin', header: 'Last checkin', render: (r: Agent) => <span className="tabular">{ago(r.last_checkin)}</span> },
     { key: 'last_heartbeat', header: 'Last heartbeat', render: (r: Agent) => <span className="tabular">{ago(r.last_heartbeat)}</span> },
-    ...(role === 'admin' ? [{
-      key: 'actions', header: 'Actions',
-      render: (r: Agent) => (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Btn onClick={() => sendCommand(r.id, 'scan_now')}>Scan now</Btn>
-          <Btn onClick={() => sendCommand(r.id, 'decommission')} danger>Decommission</Btn>
-        </div>
-      ),
-    }] : []),
   ]
 
   return (
     <>
-      <PageHeader title="Fleet" subtitle="All enrolled agents" />
+      <PageHeader title="Fleet" subtitle="Click a host to manage it or view its software" />
       <Card>
         {isLoading && <div style={{ padding: 24 }}><Spinner /></div>}
         {error && <div style={{ padding: 24 }}><ErrorMsg msg={String(error)} /></div>}
         {data && <Table columns={columns} data={data} keyFn={r => r.id} emptyText="No agents enrolled yet." />}
       </Card>
     </>
-  )
-}
-
-function Btn({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: '2px 8px', fontSize: 12, cursor: 'pointer', borderRadius: 3,
-      border: `1px solid ${danger ? 'var(--danger)' : 'var(--border)'}`,
-      color: danger ? 'var(--danger)' : 'var(--text-muted)',
-      background: 'none',
-    }}>
-      {children}
-    </button>
   )
 }
