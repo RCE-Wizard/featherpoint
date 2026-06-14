@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS web_users;
+DROP TABLE IF EXISTS enrollment_tokens;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS ingest_batches;
+DROP TABLE IF EXISTS commands;
+DROP TABLE IF EXISTS host_software;
+DROP TABLE IF EXISTS software_catalog;
+DROP TABLE IF EXISTS agents;
+DROP TABLE IF EXISTS hosts;
